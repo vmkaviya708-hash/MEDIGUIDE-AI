@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MediGuide AI</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f9d8a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="MediGuide AI">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root {
+    --bg:#eef6f5; --card:#fff; --text:#17323a; --muted:#5d7a80; --main:#0f9d8a; --on:#fff;
+    --bot:#e1f1ee; --border:#d3e4e1; --warn-bg:#fff6df; --warn-text:#6b4e00;
+    --ok:#dff5e6; --okt:#14532d; --watch:#fff1c9; --watcht:#6b4e00; --alert:#fde0e0; --alertt:#7f1d1d;
+    box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+    color-scheme:light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#0e1d20; --card:#16292d; --text:#e6f2f0; --muted:#98b4b8; --bot:#1d3a3d; --border:#27434a;
+      --warn-bg:#3a2f10; --warn-text:#f2d98a; --ok:#163a24; --okt:#b7f0c8; --watch:#3a2f10; --watcht:#f2d98a;
+      --alert:#451a1a; --alertt:#fbc4c4; color-scheme:dark;
+    }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif; display:flex; justify-content:center; }
+  body.lite .ico { display:none; }
+  .app { width:100%; max-width:440px; min-height:100vh; display:flex; flex-direction:column; }
+  header { background:var(--main); color:var(--on); padding:14px 16px; display:flex; align-items:center; gap:12px; }
+  .logo { width:40px; height:40px; border-radius:12px; background:#ffffff33; display:grid; place-items:center; font-size:22px; font-weight:bold; }
+  header h1 { font-size:18px; margin:0; } header p { font-size:12px; margin:2px 0 0; opacity:.9; }
+  main { flex:1; padding:16px; }
+  .screen { display:none; } .screen.active { display:block; }
+  h2 { font-size:20px; margin:4px 0 6px; } h3 { font-size:15px; margin:14px 0 6px; }
+  p { line-height:1.5; } .muted { color:var(--muted); font-size:13px; }
+  button { font:inherit; cursor:pointer; border:none; border-radius:12px; padding:11px 16px; background:var(--main); color:var(--on); font-weight:600; }
+  .light { background:var(--card); color:var(--main); border:1px solid var(--border); }
+  .back { background:none; color:var(--main); padding:0 0 8px; }
+  .small { padding:6px 10px; font-size:13px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .tile { background:var(--card); color:var(--text); border:1px solid var(--border); text-align:left; padding:12px; }
+  .tile .ico { display:block; font-size:24px; margin-bottom:4px; } .tile small { display:block; color:var(--muted); font-weight:400; margin-top:3px; font-size:12px; }
+  input, select, textarea { width:100%; font:inherit; padding:10px; margin:4px 0 8px; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--text); }
+  textarea { min-height:80px; }
+  .row { display:flex; gap:8px; } .row > * { flex:1; }
+  .checks label { display:flex; align-items:center; gap:8px; padding:7px 0; font-size:14px; }
+  .checks input { width:auto; margin:0; }
+  details { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin:10px 0; }
+  summary { font-weight:600; cursor:pointer; }
+  .result { margin-top:10px; padding:12px; border-radius:12px; line-height:1.5; font-size:14px; display:none; }
+  .result.ok,.result.watch,.result.alert { display:block; }
+  .ok { background:var(--ok); color:var(--okt); } .watch { background:var(--watch); color:var(--watcht); } .alert { background:var(--alert); color:var(--alertt); }
+  .messages { height:230px; overflow-y:auto; margin:8px 0; padding:10px; background:var(--bg); border-radius:12px; display:flex; flex-direction:column; gap:8px; }
+  .msg { max-width:85%; padding:9px 12px; border-radius:14px; font-size:14px; line-height:1.4; }
+  .bot { background:var(--bot); align-self:flex-start; } .user { background:var(--main); color:var(--on); align-self:flex-end; }
+  .item { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid var(--border); font-size:14px; }
+  .banner { display:none; position:sticky; top:0; z-index:5; background:var(--alert); color:var(--alertt); padding:10px 16px; font-weight:600; }
+  pre { white-space:pre-wrap; background:var(--bg); padding:10px; border-radius:10px; font:13px/1.5 inherit; }
+  .notice { margin-top:16px; padding:12px 14px; border-radius:12px; background:var(--warn-bg); color:var(--warn-text); font-size:12.5px; line-height:1.5; }
+  footer { text-align:center; padding:14px; font-size:12px; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="banner" id="banner" onclick="this.style.display='none'"></div>
+  <header>
+    <div class="logo">✚</div>
+    <div><h1>MediGuide AI</h1><p>Smart Healthcare Information Assistant</p></div>
+  </header>
+
+  <main>
+    <!-- HOME -->
+    <section id="home" class="screen active">
+      <h2>Your Health, Made Simple.</h2>
+      <p class="muted">Choose a feature to explore.</p>
+      <div class="grid">
+        <button class="tile" onclick="show('f1')"><span class="ico">🔍</span>Early Detection<small>Symptoms and reports</small></button>
+        <button class="tile" onclick="show('f2')"><span class="ico">❤️</span>Patient Monitor<small>Heart, oxygen, temperature</small></button>
+        <button class="tile" onclick="show('f3')"><span class="ico">🤖</span>AI Assistant<small>Chat, reminders, visits</small></button>
+        <button class="tile" onclick="show('f4')"><span class="ico">📝</span>Doctor Tools<small>Reports and summaries</small></button>
+        <button class="tile" onclick="show('f5')"><span class="ico">💊</span>Treatment Support<small>Allergy and history check</small></button>
+        <button class="tile" onclick="show('f6')"><span class="ico">🧪</span>Medicine Research<small>Drug interactions</small></button>
+        <button class="tile" onclick="show('f7')"><span class="ico">🚑</span>Emergency Triage<small>Who needs care first</small></button>
+        <button class="tile" onclick="show('f8')"><span class="ico">🏡</span>Rural Care<small>Basic help and remote visit</small></button>
+      </div>
+    </section>
+
+    <!-- 1. EARLY DETECTION -->
+    <section id="f1" class="screen">
+      <button class="back" onclick="show('home')">← Back</button>
+      <h2>Early Detection</h2>
+      <p class="muted">Select your symptoms. This gives general guidance, not a diagnosis.</p>
+      <div class="checks" id="symBox"></div>
+      <button onclick="checkSymptoms()">Check Symptoms</button>
+      <div class="result" id="symOut"></div>
+      <h3>Attach X-ray, MRI or blood report</h3>
+      <input type="file" accept="image/*,.pdf" onchange="fileChosen(this)">
+      <div class="result" id="fileOut"></div>
+    </section>
+
+    <!-- 2. MONITORING -->
+    <section id="f2" class="screen">
+      <button class="back" onclick="show('home'); stopLive()">← Back</button>
+      <h2>Patient Monitor</h2>
+      <p class="muted">Enter readings, or start the live demo to see alerts.</p>
+      <label>Heart rate (bpm)</label><input id="hr" type="number" value="78">
+      <label>Oxygen level SpO2 (%)</label><input id="sp" type="number" value="97">
+      <label>Temperature (°C)</label><input id="tp" type="number" step="0.1" value="36.8">
+      <div class="row"><button onclick="checkVitals()">Check</button><button class="light" id="liveBtn" onclick="toggleLive()">Start Live Demo</button></div>
+      <div class="result" id="vitOut"></div>
+    </section>
+
+    <!-- 3. ASSISTANT -->
+    <section id="f3" class="screen">
+      <button class="back" onclick="show('home')">← Back</button>
+      <h2>AI Assistant</h2>
+      <details open>
+        <summary>Health chat (demo)</summary>
+        <div class="messages" id="messages"><div class="msg bot">Hello! I am MediGuide AI. How can I help you today?</div></div>
+        <div class="row"><input id="question" placeholder="Type your question..." style="flex:3"><button onclick="sendMessage()">Send</button></div>
+      </details>
+      <details>
+        <summary>Medicine reminders</summary>
+        <input id="medName" placeholder="Medicine name"><input id="medTime" type="time">
+        <button onclick="addMed()">Add Reminder</button>
+        <div id="medList"></div>
+        <p class="muted">Alerts appear while the app is open.</p>
+      </details>
+      <details>
+        <summary>Book an appointment</summary>
+        <input id="apDoc" placeholder="Doctor or department"><input id="apDate" type="date"><input id="apTime" type="time">
+        <button onclick="addAppt()">Save Appointment</button>
+        <div id="apList"></div>
+      </details>
+      <details>
+        <summary>When should I seek medical care?</summary>
+        <p><b>Go to emergency now:</b> chest pain, trouble breathing, face drooping or slurred speech, heavy bleeding, fainting, severe allergic reaction.</p>
+        <p><b>See a doctor within 1-2 days:</b> fever for more than 3 days, repeated vomiting, pain while passing urine, a wound that is getting worse.</p>
+        <p><b>Home care is usually fine:</b> mild cold, mild headache, small cuts. Rest, drink water, and watch for changes.</p>
+      </details>
+    </section>
+
+    <!-- 4. DOCTOR TOOLS -->
+    <section id="f4" class="screen">
+      <button class="back" onclick="show('home')">← Back</button>
+      <h2>Doctor Tools</h2>
+      <details open>
+        <summary>Medical report maker</summary>
+        <input id="rName" placeholder="Patient name"><input id="rAge" type="number" placeholder="Age">
+        <input id="rComp" placeholder="Main complaint"><textarea id="rFind" placeholder="Findings"></textarea><textarea id="rAdv" placeholder="Advice"></textarea>
+        <div class="row"><button onclick="makeReport()">Create Report</button><button class="light" onclick="copyText('repOut')">Copy</button></div>
+        <pre id="repOut"></pre>
+      </details>
+      <details>
+        <summary>Patient history summarizer</summary>
+        <textarea id="hist" placeholder="Paste patient history here..."></textarea>
+        <button onclick="summarize()">Summarize</button>
+        <div class="result" id="sumOut"></div>
+      </details>
+      <details>
+        <summary>Appointment organizer</summary>
+        <div id="orgList"></div>
+        <button class="light small" onclick="renderAppts()">Refresh</button>
+      </details>
+    </section>
+
+    <!-- 5. TREATMENT SUPPORT -->
+    <section id="f5" class="screen">
+      <button class="back" onclick="show('home')">← Back</button>
+      <h2>Treatment Support</h2>
+      <p class="muted">Helps a doctor review a plan. The final choice is always the doctor’s.</p>
+      <input id="tCond" placeholder="Condition (example: fever, joint pain)">
+      <input id="tAll" placeholder="Allergies (example: penicillin, NSAIDs)">
+      <label>Medicine being considered</label>
+      <select id="tMed"></select>
+      <label>Response to previous treatment</label>
+      <select id="tResp"><option>Worked well</option><option>No improvement</option><option>Had side effects</option><option>No previous treatment</option></select>
+      <button onclick="reviewPlan()">Review</button>
+      <div class="result" id="tOut"></div>
+    </section>
+
+    <!-- 6. MEDICINE RESEARCH -->
+    <section id="f6" class="screen">
+      <button class="back" onclick="show('home')">← Back</button>
+      <h2>Medicine Research</h2>
+      <h3>Drug interaction checker</h3>
+      <div class="row"><select id="dA"></select><select id="dB"></select></div>
+      <button onclick="checkInteraction()">Check Interaction</button>
+      <div class="result" id="dOut"></div>
+      <h3>Search scientific papers</h3>
+      <input id="paper" placeholder="Example: drug candidates for malaria">
+      <button class="light" onclick="searchPapers()">Search PubMed</button>
+    </section>
+
+    <!-- 7. TRIAGE -->
+    <section id="f7" class="screen">
+      <button class="back" onclick="show('home')">← Back</button>
+      <h2>Emergency Triage</h2>
+      <p class="muted">Tick what applies to find the priority level.</p>
+      <div class="checks" id="triBox"></div>
+      <input id="triName" placeholder="Patient name">
+      <button onclick="triage()">Find Priority and Add to Queue</button>
+      <div class="result" id="triOut"></div>
+      <h3>Waiting queue (most urgent first)</h3>
+      <div id="queue"></div>
+      <button class="light small" onclick="queue=[];renderQueue()">Clear queue</button>
+    </section>
+
+    <!-- 8. RURAL CARE -->
+    <section id="f8" class="screen">
+      <button class="back" onclick="show('home')">← Back</button>
+      <h2>Rural Care</h2>
+      <p><label><input type="checkbox" onchange="document.body.classList.toggle('lite', this.checked)" style="width:auto"> Low-data mode (hides icons)</label></p>
+      <p><a href="tel:108"><button>📞 Call emergency 108 (India)</button></a></p>
+      <details open>
+        <summary>Basic health guidance</summary>
+        <p><b>Diarrhoea:</b> drink ORS and clean water. Go to a clinic if there is blood, high fever, or no urine for 8 hours.</p>
+        <p><b>Fever:</b> rest, fluids, light clothes. See a doctor if it lasts over 3 days.</p>
+        <p><b>Wounds:</b> wash with clean water and soap, cover with a clean cloth. Seek care if deep or very dirty.</p>
+        <p><b>Pregnancy or infants:</b> always take danger signs to a health centre quickly.</p>
+      </details>
+      <details>
+        <summary>Request a remote consultation</summary>
+        <input id="cName" placeholder="Name"><input id="cPlace" placeholder="Village or town"><textarea id="cProb" placeholder="Describe the problem"></textarea>
+        <select id="cMode"><option>Phone call</option><option>Video call</option><option>WhatsApp chat</option></select>
+        <div class="row"><button onclick="makeConsult()">Create Request</button><button class="light" onclick="shareText('consOut')">Share</button></div>
+        <pre id="consOut"></pre>
+      </details>
+    </section>
+
+    <div class="notice"><strong>Health Safety Notice</strong><br>This prototype provides general educational information only. It does not diagnose diseases or prescribe medicines. Consult a qualified healthcare professional for medical advice.</div>
+  </main>
+  <footer>MediGuide AI | Student Project Prototype</footer>
+</div>
+
+<script>
+  // ---------- Helpers ----------
+  function $(id) { return document.getElementById(id); }
+  function show(id) {
+    document.querySelectorAll('.screen').forEach(function (s) { s.classList.remove('active'); });
+    $(id).classList.add('active');
+    if (id === 'f4') renderAppts();
+    window.scrollTo(0, 0);
+  }
+  function out(id, cls, html) { var e = $(id); e.className = 'result ' + cls; e.innerHTML = html; }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function picked(box) { return Array.from(document.querySelectorAll('#' + box + ' input:checked')).map(function (i) { return i.value; }); }
+  function boxes(id, list) { $(id).innerHTML = list.map(function (t) { return '<label><input type="checkbox" value="' + t + '"> ' + t + '</label>'; }).join(''); }
+  function fillSelect(id, list) { $(id).innerHTML = list.map(function (t) { return '<option>' + t + '</option>'; }).join(''); }
+  function load(k) { try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) { return []; } }
+  function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function copyText(id) { var t = $(id).textContent; if (navigator.clipboard) navigator.clipboard.writeText(t); }
+  function shareText(id) { var t = $(id).textContent; if (navigator.share) navigator.share({ text: t }); else copyText(id); }
+
+  var MEDS = ['Aspirin', 'Ibuprofen', 'Paracetamol', 'Warfarin', 'Metformin', 'Amoxicillin'];
+  boxes('symBox', ['Fever', 'Cough', 'Sore throat', 'Headache', 'Fatigue', 'Frequent urination', 'Blurred vision', 'Stomach pain', 'Chest pain', 'Shortness of breath']);
+  boxes('triBox', ['Not breathing normally', 'Unconscious', 'Severe bleeding', 'Chest pain', 'Severe pain', 'High fever (above 39°C)', 'Confusion', 'Mild symptoms or minor injury']);
+  fillSelect('tMed', MEDS); fillSelect('dA', MEDS); fillSelect('dB', MEDS.slice().reverse());
+
+  // ---------- 1. Early detection ----------
+  function checkSymptoms() {
+    var s = picked('symBox'), msgs = [], cls = 'ok';
+    function has() { return Array.prototype.every.call(arguments, function (x) { return s.indexOf(x) > -1; }); }
+    if (!s.length) { out('symOut', 'watch', 'Please select at least one symptom.'); return; }
+    if (has('Chest pain') || has('Shortness of breath')) { cls = 'alert'; msgs.push('<b>Warning signs.</b> Chest pain or trouble breathing needs urgent medical care. Please see a doctor or call emergency services now.'); }
+    if (has('Fever', 'Cough') || has('Sore throat', 'Fever')) { if (cls === 'ok') cls = 'watch'; msgs.push('This pattern is common with infections such as cold or flu. Rest, drink fluids, and see a doctor if it lasts over 3 days.'); }
+    if (has('Frequent urination', 'Fatigue') || has('Frequent urination', 'Blurred vision')) { if (cls === 'ok') cls = 'watch'; msgs.push('These symptoms are worth a blood sugar test. Please talk to a doctor.'); }
+    if (has('Headache', 'Blurred vision')) { if (cls === 'ok') cls = 'watch'; msgs.push('Consider checking blood pressure and eyesight with a doctor.'); }
+    if (!msgs.length) msgs.push('Your symptoms look general. Rest, drink water, and see a doctor if they continue or get worse.');
+    if (cls === 'alert') msgs.push('<i>Demo: this case is flagged for doctor review.</i>');
+    out('symOut', cls, msgs.join('<br><br>'));
+  }
+  function fileChosen(input) {
+    if (!input.files.length) return;
+    out('fileOut', 'watch', 'Attached: <b>' + esc(input.files[0].name) + '</b><br>Reading scans needs a real medical AI and a doctor. In this demo the file is only marked for doctor review.');
+  }
+
+  // ---------- 2. Monitoring ----------
+  var liveTimer = null;
+  function checkVitals() {
+    var hr = +$('hr').value, sp = +$('sp').value, t = +$('tp').value, level = 0, r = [];
+    function add(l, m) { level = Math.max(level, l); r.push(m); }
+    if (hr < 50 || hr > 120) add(2, 'Heart rate ' + hr + ' bpm is outside the safe range.'); else if (hr > 100) add(1, 'Heart rate ' + hr + ' bpm is a little high.');
+    if (sp < 92) add(2, 'Oxygen ' + sp + '% is low.'); else if (sp < 95) add(1, 'Oxygen ' + sp + '% is slightly low.');
+    if (t >= 38 || t < 35) add(2, 'Temperature ' + t + '°C needs attention.'); else if (t >= 37.5) add(1, 'Temperature ' + t + '°C is slightly high.');
+    if (!level) out('vitOut', 'ok', '✅ All readings look normal.');
+    else out('vitOut', level === 2 ? 'alert' : 'watch', (level === 2 ? '🚨 <b>ALERT: tell medical staff.</b><br>' : '⚠️ <b>Watch closely.</b><br>') + r.join('<br>'));
+  }
+  function tick() {
+    $('hr').value = Math.round(60 + Math.random() * 70);
+    $('sp').value = Math.round(90 + Math.random() * 10);
+    $('tp').value = (36 + Math.random() * 2.8).toFixed(1);
+    checkVitals();
+  }
+  function toggleLive() { if (liveTimer) stopLive(); else { liveTimer = setInterval(tick, 2500); tick(); $('liveBtn').textContent = 'Stop Live Demo'; } }
+  function stopLive() { clearInterval(liveTimer); liveTimer = null; $('liveBtn').textContent = 'Start Live Demo'; }
+
+  // ---------- 3. Assistant: chat, reminders, appointments ----------
+  var tips = {
+    cold: 'Rest well, drink warm fluids, and wash your hands often. See a doctor if symptoms last more than a few days or you have trouble breathing.',
+    diet: 'Eat fruits, vegetables, whole grains, and protein. Eat less sugary and fried food.',
+    sleep: 'Most students need 7 to 9 hours of sleep. Keep a fixed bedtime and avoid phone screens before sleeping.',
+    exercise: 'Aim for about 30 minutes of activity on most days, such as walking, sports, or stretching.',
+    water: 'Drink water regularly through the day. Light yellow urine is a good sign of hydration.',
+    stress: 'Take short breaks, breathe slowly, talk to someone you trust, and plan study time in small parts.'
+  };
+  function getReply(t) {
+    t = t.toLowerCase();
+    if (/chest pain|breath|unconscious|bleeding/.test(t)) return 'This may be serious. Please call emergency services or go to a hospital now.';
+    if (/cold|flu|fever/.test(t)) return tips.cold;
+    if (/diet|food|eat/.test(t)) return tips.diet;
+    if (/sleep/.test(t)) return tips.sleep;
+    if (/exercise|workout/.test(t)) return tips.exercise;
+    if (/water/.test(t)) return tips.water;
+    if (/stress|anxious/.test(t)) return tips.stress;
+    if (/appointment/.test(t)) return 'Open "Book an appointment" below to save a visit.';
+    if (/remind|medicine|tablet/.test(t)) return 'Open "Medicine reminders" below to add a reminder.';
+    return 'I am a demo and know a few topics: diet, sleep, exercise, water, stress, cold and flu. For medical advice, please consult a doctor.';
+  }
+  function addMessage(text, who) {
+    var d = document.createElement('div'); d.className = 'msg ' + who; d.textContent = text;
+    $('messages').appendChild(d); $('messages').scrollTop = 99999;
+  }
+  function sendMessage() {
+    var t = $('question').value.trim(); if (!t) return;
+    addMessage(t, 'user'); $('question').value = '';
+    setTimeout(function () { addMessage(getReply(t), 'bot'); }, 400);
+  }
+  $('question').addEventListener('keydown', function (e) { if (e.key === 'Enter') sendMessage(); });
+
+  var meds = load('mg_meds'), appts = load('mg_appts');
+  function addMed() {
+    if (!$('medName').value.trim() || !$('medTime').value) return;
+    meds.push({ name: $('medName').value.trim(), time: $('medTime').value }); save('mg_meds', meds);
+    $('medName').value = ''; renderMeds();
+    if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+  }
+  function renderMeds() {
+    $('medList').innerHTML = meds.map(function (m, i) { return '<div class="item"><span>💊 ' + esc(m.name) + ' at ' + m.time + '</span><button class="small light" onclick="meds.splice(' + i + ',1);save(\'mg_meds\',meds);renderMeds()">✕</button></div>'; }).join('');
+  }
+  var lastFired = '';
+  setInterval(function () {
+    var n = new Date(), hm = ('0' + n.getHours()).slice(-2) + ':' + ('0' + n.getMinutes()).slice(-2);
+    if (hm === lastFired) return;
+    meds.forEach(function (m) {
+      if (m.time === hm) {
+        lastFired = hm;
+        $('banner').style.display = 'block'; $('banner').textContent = '💊 Time to take ' + m.name + ' (tap to close)';
+        if ('Notification' in window && Notification.permission === 'granted') new Notification('MediGuide AI', { body: 'Time to take ' + m.name });
+      }
+    });
+  }, 20000);
+
+  function addAppt() {
+    if (!$('apDoc').value.trim() || !$('apDate').value || !$('apTime').value) return;
+    appts.push({ doc: $('apDoc').value.trim(), date: $('apDate').value, time: $('apTime').value }); save('mg_appts', appts);
+    $('apDoc').value = ''; renderAppts();
+  }
+  function renderAppts() {
+    appts.sort(function (a, b) { return (a.date + a.time).localeCompare(b.date + b.time); });
+    var html = appts.map(function (a, i) { return '<div class="item"><span>📅 ' + esc(a.doc) + '<br><span class="muted">' + a.date + ' at ' + a.time + '</span></span><button class="small light" onclick="appts.splice(' + i + ',1);save(\'mg_appts\',appts);renderAppts()">✕</button></div>'; }).join('');
+    $('apList').innerHTML = html; $('orgList').innerHTML = html || '<p class="muted">No appointments yet. Add them in AI Assistant.</p>';
+  }
+  renderMeds(); renderAppts();
+
+  // ---------- 4. Doctor tools ----------
+  function makeReport() {
+    $('repOut').textContent = 'MEDICAL REPORT\nDate: ' + new Date().toLocaleDateString() +
+      '\nPatient: ' + $('rName').value + '\nAge: ' + $('rAge').value +
+      '\nComplaint: ' + $('rComp').value + '\nFindings: ' + $('rFind').value + '\nAdvice: ' + $('rAdv').value +
+      '\n\n(Draft prepared by MediGuide AI. Doctor must review and sign.)';
+  }
+  function summarize() {
+    var text = $('hist').value.trim(); if (!text) return;
+    var sentences = text.split(/(?<=[.!?\n])\s+/).filter(Boolean);
+    var key = sentences.filter(function (s) { return /allerg|diabet|pressure|surgery|tablet|medicine|asthma|smok/i.test(s); });
+    out('sumOut', 'ok', '<b>Summary</b><br>' + esc(sentences.slice(0, 3).join(' ')) + '<br><br><b>Key points</b><br>' + (key.length ? key.map(esc).join('<br>') : 'No allergy or medicine details found.'));
+  }
+
+  // ---------- 5. Treatment support ----------
+  var ALLERGY = { penicillin: ['Amoxicillin'], nsaid: ['Ibuprofen', 'Aspirin'], aspirin: ['Aspirin', 'Ibuprofen'], ibuprofen: ['Ibuprofen'], paracetamol: ['Paracetamol'] };
+  function reviewPlan() {
+    var med = $('tMed').value, all = $('tAll').value.toLowerCase(), resp = $('tResp').value, lines = [], cls = 'ok';
+    Object.keys(ALLERGY).forEach(function (k) { if (all.indexOf(k) > -1 && ALLERGY[k].indexOf(med) > -1) { cls = 'alert'; lines.push('🚨 Possible allergy conflict: ' + med + ' with ' + k + ' allergy.'); } });
+    if (resp === 'No improvement') { if (cls === 'ok') cls = 'watch'; lines.push('Previous treatment did not help. The doctor may review dose, duration, or other options.'); }
+    if (resp === 'Had side effects') { if (cls === 'ok') cls = 'watch'; lines.push('Side effects were reported before. Record them and consider alternatives.'); }
+    if (resp === 'Worked well') lines.push('Previous treatment worked well. The doctor may continue a similar approach.');
+    if (!lines.length) lines.push('No conflicts found in this small demo list.');
+    lines.push('<i>Condition: ' + esc($('tCond').value || 'not entered') + '. The final decision belongs to the doctor.</i>');
+    out('tOut', cls, lines.join('<br><br>'));
+  }
+
+  // ---------- 6. Medicine research ----------
+  var PAIRS = [
+    ['Aspirin', 'Ibuprofen', 'watch', 'Ibuprofen may weaken the heart-protecting effect of aspirin, and both raise stomach bleeding risk.'],
+    ['Aspirin', 'Warfarin', 'alert', 'Higher risk of serious bleeding.'],
+    ['Ibuprofen', 'Warfarin', 'alert', 'Higher risk of serious bleeding.'],
+    ['Paracetamol', 'Warfarin', 'watch', 'Regular high doses of paracetamol can increase warfarin’s effect.'],
+    ['Ibuprofen', 'Metformin', 'watch', 'Painkillers like ibuprofen can affect the kidneys, which matters for metformin safety.']
+  ];
+  function checkInteraction() {
+    var a = $('dA').value, b = $('dB').value;
+    if (a === b) { out('dOut', 'watch', 'Please choose two different medicines.'); return; }
+    var hit = PAIRS.filter(function (p) { return (p[0] === a && p[1] === b) || (p[0] === b && p[1] === a); })[0];
+    if (hit) out('dOut', hit[2], '<b>' + a + ' + ' + b + '</b><br>' + hit[3] + '<br><br>Ask a doctor or pharmacist before combining.');
+    else out('dOut', 'ok', 'No interaction found in this small demo list. This is not proof it is safe. Ask a pharmacist.');
+  }
+  function searchPapers() {
+    var q = $('paper').value.trim(); if (!q) return;
+    window.open('https://pubmed.ncbi.nlm.nih.gov/?term=' + encodeURIComponent(q), '_blank');
+  }
+
+  // ---------- 7. Triage ----------
+  var queue = [], RANK = { Red: 0, Orange: 1, Green: 2 };
+  function triage() {
+    var s = picked('triBox'), p = 'Green';
+    if (s.some(function (x) { return ['Chest pain', 'Severe pain', 'High fever (above 39°C)', 'Confusion'].indexOf(x) > -1; })) p = 'Orange';
+    if (s.some(function (x) { return ['Not breathing normally', 'Unconscious', 'Severe bleeding'].indexOf(x) > -1; })) p = 'Red';
+    var label = { Red: '🔴 RED: immediate care', Orange: '🟠 ORANGE: urgent', Green: '🟢 GREEN: non-urgent' }[p];
+    out('triOut', p === 'Red' ? 'alert' : p === 'Orange' ? 'watch' : 'ok', '<b>' + label + '</b>');
+    queue.push({ name: $('triName').value.trim() || 'Patient ' + (queue.length + 1), p: p }); $('triName').value = ''; renderQueue();
+  }
+  function renderQueue() {
+    queue.sort(function (a, b) { return RANK[a.p] - RANK[b.p]; });
+    var dot = { Red: '🔴', Orange: '🟠', Green: '🟢' };
+    $('queue').innerHTML = queue.map(function (q, i) { return '<div class="item"><span>' + dot[q.p] + ' ' + esc(q.name) + '</span><button class="small light" onclick="queue.splice(' + i + ',1);renderQueue()">Seen</button></div>'; }).join('') || '<p class="muted">Queue is empty.</p>';
+  }
+  renderQueue();
+
+  // ---------- 8. Rural care ----------
+  function makeConsult() {
+    $('consOut').textContent = 'REMOTE CONSULTATION REQUEST\nName: ' + $('cName').value + '\nPlace: ' + $('cPlace').value +
+      '\nProblem: ' + $('cProb').value + '\nPreferred: ' + $('cMode').value;
+  }
+
+  // ---------- Offline support ----------
+  if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js'); }
+</script>
+</body>
+</html>
